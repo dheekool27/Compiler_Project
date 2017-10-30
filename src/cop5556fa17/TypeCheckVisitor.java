@@ -1,11 +1,17 @@
 package cop5556fa17;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.HashMap;
+
 import cop5556fa17.Scanner.Token;
+import cop5556fa17.TypeUtils.Type;
 import cop5556fa17.AST.ASTNode;
 import cop5556fa17.AST.ASTVisitor;
 import cop5556fa17.AST.Declaration_Image;
 import cop5556fa17.AST.Declaration_SourceSink;
 import cop5556fa17.AST.Declaration_Variable;
+import cop5556fa17.AST.Expression;
 import cop5556fa17.AST.Expression_Binary;
 import cop5556fa17.AST.Expression_BooleanLit;
 import cop5556fa17.AST.Expression_Conditional;
@@ -21,6 +27,7 @@ import cop5556fa17.AST.LHS;
 import cop5556fa17.AST.Program;
 import cop5556fa17.AST.Sink_Ident;
 import cop5556fa17.AST.Sink_SCREEN;
+import cop5556fa17.AST.Source;
 import cop5556fa17.AST.Source_CommandLineParam;
 import cop5556fa17.AST.Source_Ident;
 import cop5556fa17.AST.Source_StringLiteral;
@@ -29,53 +36,64 @@ import cop5556fa17.AST.Statement_In;
 import cop5556fa17.AST.Statement_Out;
 
 public class TypeCheckVisitor implements ASTVisitor {
-	
 
-		@SuppressWarnings("serial")
-		public static class SemanticException extends Exception {
-			Token t;
+	public HashMap<String, ASTNode> symbolTable = new HashMap<>();
 
-			public SemanticException(Token t, String message) {
-				super("line " + t.line + " pos " + t.pos_in_line + ": "+  message);
-				this.t = t;
-			}
+	@SuppressWarnings("serial")
+	public static class SemanticException extends Exception {
+		Token t;
 
-		}		
-		
+		public SemanticException(Token t, String message) {
+			super("line " + t.line + " pos " + t.pos_in_line + ": " + message);
+			this.t = t;
+		}
+	}
 
-	
 	/**
-	 * The program name is only used for naming the class.  It does not rule out
-	 * variables with the same name.  It is returned for convenience.
+	 * The program name is only used for naming the class. It does not rule out
+	 * variables with the same name. It is returned for convenience.
 	 * 
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	@Override
 	public Object visitProgram(Program program, Object arg) throws Exception {
-		for (ASTNode node: program.decsAndStatements) {
+		for (ASTNode node : program.decsAndStatements) {
 			node.visit(this, arg);
 		}
 		return program.name;
 	}
 
 	@Override
-	public Object visitDeclaration_Variable(
-			Declaration_Variable declaration_Variable, Object arg)
-			throws Exception {
+	public Object visitDeclaration_Variable(Declaration_Variable declaration_Variable, Object arg) throws Exception {
+
+		declaration_Variable.type_attribute = TypeUtils.getType(declaration_Variable.type);
+		String name = declaration_Variable.name;
+		if (symbolTable.containsKey(name)) {
+			throw new SemanticException(declaration_Variable.firstToken, name + "already in symbol table");
+		} else {
+			symbolTable.put(name, declaration_Variable);
+		}
+		Expression expression = declaration_Variable.e;
+		if (declaration_Variable.e != null) {
+			expression.visit(this, arg);
+			Type expression_type = expression.type_attribute;
+			Type declarationVariable_type = declaration_Variable.type_attribute;
+			if (expression_type != declarationVariable_type) {
+				throw new SemanticException(declaration_Variable.firstToken,
+						name + "Type mismatch between expression and declaration variable");
+			}
+		}
+		return declaration_Variable.type_attribute;
+	}
+
+	@Override
+	public Object visitExpression_Binary(Expression_Binary expression_Binary, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitExpression_Binary(Expression_Binary expression_Binary,
-			Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public Object visitExpression_Unary(Expression_Unary expression_Unary,
-			Object arg) throws Exception {
+	public Object visitExpression_Unary(Expression_Unary expression_Unary, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
@@ -87,107 +105,109 @@ public class TypeCheckVisitor implements ASTVisitor {
 	}
 
 	@Override
-	public Object visitExpression_PixelSelector(
-			Expression_PixelSelector expression_PixelSelector, Object arg)
+	public Object visitExpression_PixelSelector(Expression_PixelSelector expression_PixelSelector, Object arg)
 			throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitExpression_Conditional(
-			Expression_Conditional expression_Conditional, Object arg)
+	public Object visitExpression_Conditional(Expression_Conditional expression_Conditional, Object arg)
 			throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitDeclaration_Image(Declaration_Image declaration_Image,
-			Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	public Object visitDeclaration_Image(Declaration_Image declaration_Image, Object arg) throws Exception {
+
+		declaration_Image.type_attribute = Type.IMAGE;
+		String name = declaration_Image.name;
+		if (symbolTable.containsKey(name)) {
+			throw new SemanticException(declaration_Image.firstToken, name + "already in symbol table");
+		} else {
+			symbolTable.put(name, declaration_Image);
+		}
+		Source source = declaration_Image.source;
+		source.visit(this, arg);
+
+		return declaration_Image.type_attribute;
 	}
 
 	@Override
-	public Object visitSource_StringLiteral(
-			Source_StringLiteral source_StringLiteral, Object arg)
+	public Object visitSource_StringLiteral(Source_StringLiteral source_StringLiteral, Object arg) throws Exception {
+
+		try {
+			new URL(source_StringLiteral.fileOrUrl);
+			source_StringLiteral.type_attribute = Type.URL;
+		} catch (MalformedURLException e) {
+			source_StringLiteral.type_attribute = Type.FILE;
+		}
+		return source_StringLiteral.type_attribute;
+	}
+
+	@Override
+	public Object visitSource_CommandLineParam(Source_CommandLineParam source_CommandLineParam, Object arg)
 			throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitSource_CommandLineParam(
-			Source_CommandLineParam source_CommandLineParam, Object arg)
+	public Object visitSource_Ident(Source_Ident source_Ident, Object arg) throws Exception {
+
+		source_Ident.type_attribute = symbolTable.get(source_Ident.name).type_attribute;
+		return source_Ident.type_attribute;
+	}
+
+	@Override
+	public Object visitDeclaration_SourceSink(Declaration_SourceSink declaration_SourceSink, Object arg)
 			throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitSource_Ident(Source_Ident source_Ident, Object arg)
-			throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public Object visitDeclaration_SourceSink(
-			Declaration_SourceSink declaration_SourceSink, Object arg)
-			throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public Object visitExpression_IntLit(Expression_IntLit expression_IntLit,
-			Object arg) throws Exception {
+	public Object visitExpression_IntLit(Expression_IntLit expression_IntLit, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public Object visitExpression_FunctionAppWithExprArg(
-			Expression_FunctionAppWithExprArg expression_FunctionAppWithExprArg,
-			Object arg) throws Exception {
+			Expression_FunctionAppWithExprArg expression_FunctionAppWithExprArg, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public Object visitExpression_FunctionAppWithIndexArg(
-			Expression_FunctionAppWithIndexArg expression_FunctionAppWithIndexArg,
-			Object arg) throws Exception {
+			Expression_FunctionAppWithIndexArg expression_FunctionAppWithIndexArg, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitExpression_PredefinedName(
-			Expression_PredefinedName expression_PredefinedName, Object arg)
+	public Object visitExpression_PredefinedName(Expression_PredefinedName expression_PredefinedName, Object arg)
 			throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitStatement_Out(Statement_Out statement_Out, Object arg)
-			throws Exception {
+	public Object visitStatement_Out(Statement_Out statement_Out, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitStatement_In(Statement_In statement_In, Object arg)
-			throws Exception {
+	public Object visitStatement_In(Statement_In statement_In, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitStatement_Assign(Statement_Assign statement_Assign,
-			Object arg) throws Exception {
+	public Object visitStatement_Assign(Statement_Assign statement_Assign, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
@@ -199,30 +219,25 @@ public class TypeCheckVisitor implements ASTVisitor {
 	}
 
 	@Override
-	public Object visitSink_SCREEN(Sink_SCREEN sink_SCREEN, Object arg)
-			throws Exception {
+	public Object visitSink_SCREEN(Sink_SCREEN sink_SCREEN, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitSink_Ident(Sink_Ident sink_Ident, Object arg)
-			throws Exception {
+	public Object visitSink_Ident(Sink_Ident sink_Ident, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitExpression_BooleanLit(
-			Expression_BooleanLit expression_BooleanLit, Object arg)
-			throws Exception {
+	public Object visitExpression_BooleanLit(Expression_BooleanLit expression_BooleanLit, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public Object visitExpression_Ident(Expression_Ident expression_Ident,
-			Object arg) throws Exception {
+	public Object visitExpression_Ident(Expression_Ident expression_Ident, Object arg) throws Exception {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
