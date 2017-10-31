@@ -2,12 +2,12 @@ package cop5556fa17.AST;
 
 import cop5556fa17.Scanner.Token;
 
-public class LHS extends ASTNode{
+public class LHS extends ASTNode {
 
 	public final String name;
 	public final Index index;
-
-
+	public Declaration declaration;
+	public boolean isCartesian;
 
 	public LHS(Token firstToken, Token name, Index index) {
 		super(firstToken);
@@ -17,7 +17,7 @@ public class LHS extends ASTNode{
 
 	@Override
 	public Object visit(ASTVisitor v, Object arg) throws Exception {
-		return v.visitLHS(this,arg);
+		return v.visitLHS(this, arg);
 	}
 
 	@Override
@@ -62,7 +62,4 @@ public class LHS extends ASTNode{
 		return builder.toString();
 	}
 
-
-	
-	
 }

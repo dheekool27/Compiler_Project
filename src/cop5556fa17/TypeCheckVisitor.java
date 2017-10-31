@@ -4,10 +4,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 
+import cop5556fa17.Scanner.Kind;
 import cop5556fa17.Scanner.Token;
 import cop5556fa17.TypeUtils.Type;
 import cop5556fa17.AST.ASTNode;
 import cop5556fa17.AST.ASTVisitor;
+import cop5556fa17.AST.Declaration;
 import cop5556fa17.AST.Declaration_Image;
 import cop5556fa17.AST.Declaration_SourceSink;
 import cop5556fa17.AST.Declaration_Variable;
@@ -100,8 +102,18 @@ public class TypeCheckVisitor implements ASTVisitor {
 
 	@Override
 	public Object visitIndex(Index index, Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+
+		index.e0.visit(this, arg);
+		index.e1.visit(this, arg);
+		if (index.e0.type_attribute != Type.INTEGER || index.e1.type_attribute != Type.INTEGER) {
+			throw new SemanticException(index.firstToken,
+					"expression0 and expresssion1 in Index must be of Integer type");
+		}
+
+		index.setCartesian(!(index.e0.getClass().equals(Expression_PredefinedName.class)
+				&& index.e1.getClass().equals(Expression_PredefinedName.class) && index.e0.firstToken.kind == Kind.KW_r
+				&& index.e1.firstToken.kind == Kind.KW_a));
+		return index.type_attribute;
 	}
 
 	@Override
@@ -124,13 +136,15 @@ public class TypeCheckVisitor implements ASTVisitor {
 		declaration_Image.type_attribute = Type.IMAGE;
 		String name = declaration_Image.name;
 		if (symbolTable.containsKey(name)) {
-			throw new SemanticException(declaration_Image.firstToken, name + "already in symbol table");
+			throw new SemanticException(declaration_Image.firstToken, name + " already in symbol table");
 		} else {
 			symbolTable.put(name, declaration_Image);
 		}
-		Source source = declaration_Image.source;
-		source.visit(this, arg);
-
+		if (declaration_Image.xSize != null) {
+			declaration_Image.xSize.visit(this, arg);
+			declaration_Image.ySize.visit(this, arg);
+		}
+		declaration_Image.source.visit(this, arg);
 		return declaration_Image.type_attribute;
 	}
 
@@ -149,15 +163,26 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitSource_CommandLineParam(Source_CommandLineParam source_CommandLineParam, Object arg)
 			throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		source_CommandLineParam.paramNum.visit(this, arg);
+		source_CommandLineParam.type_attribute = source_CommandLineParam.paramNum.type_attribute;
+		Type source_CommandLineParam_type = source_CommandLineParam.type_attribute;
+		if (source_CommandLineParam_type != Type.INTEGER) {
+			throw new SemanticException(source_CommandLineParam.firstToken,
+					"source_commandLineParam expects an integer data type");
+		}
+
+		return source_CommandLineParam_type;
 	}
 
 	@Override
 	public Object visitSource_Ident(Source_Ident source_Ident, Object arg) throws Exception {
 
 		source_Ident.type_attribute = symbolTable.get(source_Ident.name).type_attribute;
-		return source_Ident.type_attribute;
+		if (source_Ident.type_attribute == Type.FILE || source_Ident.type_attribute == Type.URL) {
+			return source_Ident.type_attribute;
+		} else {
+			throw new SemanticException(source_Ident.firstToken, "source_Ident expects a File or URL data type");
+		}
 	}
 
 	@Override
@@ -214,20 +239,27 @@ public class TypeCheckVisitor implements ASTVisitor {
 
 	@Override
 	public Object visitLHS(LHS lhs, Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		lhs.declaration = (Declaration) symbolTable.get(lhs.name);
+		lhs.type_attribute = lhs.declaration.type_attribute;
+		lhs.index.visit(this, arg);
+		lhs.isCartesian = lhs.index.isCartesian();
+		return lhs.type_attribute;
 	}
 
 	@Override
 	public Object visitSink_SCREEN(Sink_SCREEN sink_SCREEN, Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		sink_SCREEN.type_attribute = Type.SCREEN;
+		return sink_SCREEN.type_attribute;
 	}
 
 	@Override
 	public Object visitSink_Ident(Sink_Ident sink_Ident, Object arg) throws Exception {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		sink_Ident.type_attribute = symbolTable.get(sink_Ident.name).type_attribute;
+		if (sink_Ident.type_attribute == Type.FILE) {
+			return sink_Ident.type_attribute;
+		} else {
+			throw new SemanticException(sink_Ident.firstToken, "sink_ident expects a file type");
+		}
 	}
 
 	@Override
